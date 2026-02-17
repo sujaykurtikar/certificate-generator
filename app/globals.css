@@ -1,0 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:wght@400;700&display=swap');
+
+body { margin:0; font-family: 'Montserrat', sans-serif; }
+.sidebar { width:300px; padding:16px; background:#fff; border-right:1px solid #ddd; overflow:auto; }
+.button { width:100%; padding:8px; margin-top:8px; cursor:pointer; border:none; border-radius:4px; }
+.primary { background:#1f6f4a; color:#fff; }
+.secondary { background:#ddd; }
