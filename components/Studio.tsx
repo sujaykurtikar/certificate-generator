@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { fabric } from 'fabric'
 import { jsPDF } from 'jspdf'
 import JSZip from 'jszip'
+import { supabase } from '../lib/supabase'
 
 const DEFAULT_WIDTH = 1400
 const DEFAULT_HEIGHT = 990
@@ -20,7 +21,7 @@ export default function Studio() {
   const [fontFamily, setFontFamily] = useState('serif')
   const [names, setNames] = useState<string[]>([])
   const [currentName, setCurrentName] = useState('')
-  const [layouts, setLayouts] = useState<string[]>([])
+  const [layouts, setLayouts] = useState<any[]>([])
   const [backgrounds, setBackgrounds] = useState<string[]>([])
   const [canvasWidth, setCanvasWidth] = useState(DEFAULT_WIDTH)
   const [canvasHeight, setCanvasHeight] = useState(DEFAULT_HEIGHT)
@@ -29,6 +30,7 @@ export default function Studio() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   const [isLocked, setIsLocked] = useState(true)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
   const [logoFile, setLogoFile] = useState<string>('No file chosen')
@@ -36,19 +38,34 @@ export default function Studio() {
   const [bgFile, setBgFile] = useState<string>('No file chosen')
 
   useEffect(() => {
-    const auth = localStorage.getItem('auth')
-    if (auth === 'true') {
-      setIsLocked(false)
-    }
+    checkUser()
   }, [])
 
-  const handleUnlock = () => {
-    if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'goagad123') {
-      localStorage.setItem('auth', 'true')
+  const checkUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
       setIsLocked(false)
-    } else {
-      alert("Incorrect password")
+      loadLayouts()
     }
+  }
+
+  const handleUnlock = async () => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      alert(error.message)
+    } else {
+      setIsLocked(false)
+      loadLayouts()
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setIsLocked(true)
   }
 
   const updateScale = useCallback(() => {
@@ -230,29 +247,50 @@ export default function Studio() {
   const enableDraw = () => { if (fabricRef.current) fabricRef.current.isDrawingMode = true }
   const disableDraw = () => { if (fabricRef.current) fabricRef.current.isDrawingMode = false }
 
-  const saveLayout = () => {
+  const saveLayout = async () => {
     if (!fabricRef.current) return
     const trekName = prompt("Enter Trek Name (e.g., Kalsubai, AMK)")
     if (!trekName) return
 
+    const { data: userData } = await supabase.auth.getUser()
     const layoutData = fabricRef.current.toJSON(['customType'])
-    const allTemplates = JSON.parse(localStorage.getItem("trekTemplates") || "{}")
-    allTemplates[trekName] = layoutData
-    localStorage.setItem("trekTemplates", JSON.stringify(allTemplates))
 
-    loadLayouts()
+    const { error } = await supabase
+      .from("certificate_templates")
+      .insert([
+        {
+          trek_name: trekName,
+          layout: layoutData,
+          created_by: userData.user?.id
+        }
+      ])
+
+    if (error) {
+      console.error(error)
+      alert("Error saving template")
+    } else {
+      alert("Template saved successfully")
+      loadLayouts()
+    }
   }
 
-  const loadLayouts = () => {
-    const allTemplates = JSON.parse(localStorage.getItem("trekTemplates") || "{}")
-    setLayouts(Object.keys(allTemplates))
+  const loadLayouts = async () => {
+    const { data, error } = await supabase
+      .from("certificate_templates")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error(error)
+    } else {
+      setLayouts(data || [])
+    }
   }
 
-  const loadLayout = (name: string) => {
-    const allTemplates = JSON.parse(localStorage.getItem("trekTemplates") || "{}")
-    const data = allTemplates[name]
-    if (!data || !fabricRef.current) return
-    fabricRef.current.loadFromJSON(data, () => fabricRef.current?.renderAll())
+  const loadLayout = (id: string) => {
+    const template = layouts.find(l => l.id === id)
+    if (!template || !fabricRef.current) return
+    fabricRef.current.loadFromJSON(template.layout, () => fabricRef.current?.renderAll())
   }
 
   const exportCertificates = async () => {
@@ -385,6 +423,14 @@ export default function Studio() {
             >
               {theme === 'light' ? <MoonIcon /> : <SunIcon />}
             </button>
+            <button
+              onClick={handleLogout}
+              className="header-icon-btn"
+              title="Logout"
+              style={{ color: 'var(--danger)', marginLeft: '4px' }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+            </button>
             <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
               <CloseIcon />
             </button>
@@ -498,7 +544,7 @@ export default function Studio() {
               <label className="field-label">Select Trek Location</label>
               <select className="field-input" onChange={e => loadLayout(e.target.value)}>
                 <option value="">— Select trek —</option>
-                {layouts.map(l => <option key={l} value={l}>{l}</option>)}
+                {layouts.map(l => <option key={l.id} value={l.id}>{l.trek_name}</option>)}
               </select>
             </div>
           </div>
@@ -577,13 +623,21 @@ export default function Studio() {
               <h2>GOAGAD Certificate Studio</h2>
               <div className="field-group">
                 <input
+                  type="email"
+                  className="field-input"
+                  placeholder="admin@goagad.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{ marginBottom: '12px' }}
+                  autoFocus
+                />
+                <input
                   type="password"
                   className="field-input"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
-                  autoFocus
                 />
               </div>
               <button className="btn btn-accent btn-primary" onClick={handleUnlock}>
