@@ -37,6 +37,10 @@ export default function Studio() {
   const [sigFile, setSigFile] = useState<string>('No file chosen')
   const [bgFile, setBgFile] = useState<string>('No file chosen')
 
+  const [bgUrl, setBgUrl] = useState<string>('/default-bg.png')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [sigUrl, setSigUrl] = useState<string | null>(null)
+
   useEffect(() => {
     checkUser()
   }, [])
@@ -99,57 +103,92 @@ export default function Studio() {
       canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas))
     })
 
-    // Editable Layers
-    addText("CERTIFICATE", canvasWidth / 2, 180, 80, true, 'Cinzel', '#8B6B2E', 1000)
-    addText("OF ACHIEVEMENT", canvasWidth / 2, 250, 32, false, 'Cinzel', '#8B6B2E', 800)
-    addText("Kalsubai Trek - Highest Peak of Maharashtra", canvasWidth / 2, 320, 24, true, 'Montserrat', '#1D1D1B', 1000)
-    addText("This Certificate Is Proudly Presented To", canvasWidth / 2, 365, 18, false, 'Montserrat', '#555', 800)
+    // Explicitly pre-load all font variants before adding text
+    // This guarantees correct font metrics even on first load (cold cache)
+    const initDefaultLayout = async () => {
+      await Promise.all([
+        document.fonts.load('bold 80px Cinzel'),
+        document.fonts.load('normal 32px Cinzel'),
+        document.fonts.load('bold 24px Montserrat'),
+        document.fonts.load('normal 18px Montserrat'),
+        document.fonts.load('bold 28px Montserrat'),
+        document.fonts.load('normal 22px Lora'),
+        document.fonts.load('normal 42px "Alex Brush"'),
+      ])
 
-    const nameField = new fabric.Textbox("MILIND GAUDE", {
-      left: canvasWidth / 2,
-      top: 415,
-      width: 1000,
-      fontSize: 64,
-      textAlign: 'center',
-      originX: 'center',
-      fill: '#8B6B2E',
-      fontWeight: 'bold',
-      fontFamily: 'Cinzel'
-    })
-    nameField.set('customType', 'name')
-    canvas.add(nameField)
+      // All fonts are now guaranteed to be available
+      // Centered Layers using relative canvasWidth / 2
+      addText("CERTIFICATE", canvasWidth / 2, 180, 80, true, 'Cinzel', '#8B6B2E', 1600)
+      addText("OF ACHIEVEMENT", canvasWidth / 2, 268.93, 32, false, 'Cinzel', '#8B6B2E', 1400)
+      addText("Kalsubai Trek - Highest Peak of Maharashtra", canvasWidth / 2, 320, 24, true, 'Montserrat', '#1D1D1B', 1600)
+      addText("This Certificate Is Proudly Presented To", canvasWidth / 2, 365, 18, false, 'Montserrat', '#555', 1400)
 
-    const description = "This certificate is awarded for successfully completing the Kalsubai trek. One of the most challenging treks in Maharashtra, and we commend you for your determination and perseverance. We hope this certificate serves as a reminder of your incredible achievement and inspires you to continue exploring the great outdoors. Congrats!"
+      const nameField = new fabric.Textbox("MILIND GAUDE", {
+        left: canvasWidth / 2,
+        top: 415,
+        width: 1600,
+        fontSize: 64,
+        textAlign: 'center',
+        originX: 'center',
+        fill: '#8B6B2E',
+        fontWeight: 'bold',
+        fontFamily: 'Cinzel',
+        splitByGrapheme: false,
+        padding: 30,
+        lockScalingY: true,
+        objectCaching: false
+      })
+      nameField.set('customType', 'name')
+      canvas.add(nameField)
 
-    const descText = new fabric.Textbox(description, {
-      left: canvasWidth / 2,
-      top: 510,
-      width: 1000,
-      fontSize: 20,
-      textAlign: 'center',
-      originX: 'center',
-      fill: '#1D1D1B',
-      fontFamily: 'Lora',
-      lineHeight: 1.2
-    })
-    canvas.add(descText)
+      const description = "This certificate is awarded for successfully completing the Kalsubai trek. One of the most challenging treks in Maharashtra, and we commend you for your determination and perseverance. We hope this certificate serves as a reminder of your incredible achievement and inspires you to continue exploring the great outdoors. Congratulations!"
 
-    const footerY = 800
-    const footerOffset = 300
+      const descText = new fabric.Textbox(description, {
+        left: canvasWidth / 2,
+        top: 513.79,
+        width: 886.8,
+        fontSize: 22,
+        textAlign: 'center',
+        originX: 'center',
+        fill: '#1D1D1B',
+        fontFamily: 'Lora',
+        lineHeight: 1.5,
+        splitByGrapheme: false,
+        padding: 30,
+        lockScalingY: true,
+        objectCaching: false
+      })
+      canvas.add(descText)
 
-    addText("21/08/2025", canvasWidth / 2 - footerOffset, footerY, 28, true, 'Montserrat', '#1D1D1B', 300)
-    const dateLine = new fabric.Line([canvasWidth / 2 - footerOffset - 120, footerY + 40, canvasWidth / 2 - footerOffset + 120, footerY + 40], {
-      stroke: '#1D1D1B', strokeWidth: 1, selectable: false
-    })
-    canvas.add(dateLine)
-    addText("DATE", canvasWidth / 2 - footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 200)
+      const leftFooterX = canvasWidth / 2 - 218.67
+      const rightFooterX = canvasWidth / 2 + 246.45
 
-    addText("Milind Gaude", canvasWidth / 2 + footerOffset, footerY - 10, 36, false, 'Alex Brush', '#1D1D1B', 300)
-    const sigLine = new fabric.Line([canvasWidth / 2 + footerOffset - 120, footerY + 40, canvasWidth / 2 + footerOffset + 120, footerY + 40], {
-      stroke: '#1D1D1B', strokeWidth: 1, selectable: false
-    })
-    canvas.add(sigLine)
-    addText("Head Operations", canvasWidth / 2 + footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 300)
+      addText("21/08/2025", leftFooterX, 788.45, 28, true, 'Montserrat', '#1D1D1B', 400)
+      const dateLine = new fabric.Line([-120, 0, 120, 0], {
+        left: leftFooterX - 120, top: 839.81, stroke: '#1D1D1B', strokeWidth: 1.5, selectable: true
+      })
+      canvas.add(dateLine)
+      addText("DATE", leftFooterX + 2.52, 849.81, 18, true, 'Montserrat', '#1D1D1B', 300)
+
+      addText("Milind Gaude", rightFooterX, 787.29, 42, false, 'Alex Brush', '#1D1D1B', 400)
+      const sigLine = new fabric.Line([-120, 0, 120, 0], {
+        left: rightFooterX - 120, top: 837.29, stroke: '#1D1D1B', strokeWidth: 1.5, selectable: true
+      })
+      canvas.add(sigLine)
+      addText("Head Operations", rightFooterX, 847.29, 18, true, 'Montserrat', '#1D1D1B', 400)
+
+      // Final sync after all objects added
+      canvas.getObjects().forEach(obj => {
+        if (obj instanceof fabric.Textbox) {
+          obj.set({ objectCaching: false });
+          obj.initDimensions();
+          obj.setCoords();
+        }
+      });
+      canvas.renderAll()
+    }
+
+    initDefaultLayout()
 
     loadLayouts()
     fetchBackgrounds()
@@ -167,6 +206,8 @@ export default function Studio() {
 
   const changeBackground = (url: string) => {
     if (!fabricRef.current) return
+    setBgUrl(url)
+    setBgFile(url.split('/').pop() || url)
     fabric.Image.fromURL(url, img => {
       img.scaleToWidth(canvasWidth)
       img.scaleToHeight(canvasHeight)
@@ -186,6 +227,7 @@ export default function Studio() {
       const res = await fetch('/api/upload-bg', { method: 'POST', body: formData })
       const data = await res.json()
       if (data.success) {
+        setBgUrl(data.url)
         fetchBackgrounds()
         changeBackground(data.url)
       } else {
@@ -196,11 +238,15 @@ export default function Studio() {
     }
   }
 
-  const addText = (text: string, x: number, y: number, size: number, bold: boolean, family = 'serif', color = '#000', width = 800) => {
+  const addText = (text: string, x: number, y: number, size: number, bold: boolean, family = 'serif', color = '#000', width = 1200) => {
     const t = new fabric.Textbox(text, {
       left: x, top: y, width, fontSize: size, fill: color,
       textAlign: 'center', originX: 'center', fontFamily: family,
-      fontWeight: bold ? 'bold' : 'normal'
+      fontWeight: bold ? 'bold' : 'normal',
+      splitByGrapheme: false,
+      padding: 15,
+      lockScalingY: true,
+      objectCaching: false
     })
     fabricRef.current?.add(t)
   }
@@ -218,7 +264,9 @@ export default function Studio() {
     setLogoFile(file.name)
     const reader = new FileReader()
     reader.onload = f => {
-      fabric.Image.fromURL(f.target?.result as string, img => {
+      const result = f.target?.result as string
+      setLogoUrl(result)
+      fabric.Image.fromURL(result, img => {
         img.left = canvasWidth - 300
         img.top = 60
         img.scaleToWidth(180)
@@ -234,7 +282,9 @@ export default function Studio() {
     setSigFile(file.name)
     const reader = new FileReader()
     reader.onload = f => {
-      fabric.Image.fromURL(f.target?.result as string, img => {
+      const result = f.target?.result as string
+      setSigUrl(result)
+      fabric.Image.fromURL(result, img => {
         img.left = canvasWidth - 400
         img.top = 720
         img.scaleToWidth(200)
@@ -252,25 +302,40 @@ export default function Studio() {
     const trekName = prompt("Enter Trek Name (e.g., Kalsubai, AMK)")
     if (!trekName) return
 
-    const { data: userData } = await supabase.auth.getUser()
-    const layoutData = fabricRef.current.toJSON(['customType'])
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert("Please login first to save templates.")
+        return
+      }
 
-    const { error } = await supabase
-      .from("certificate_templates")
-      .insert([
-        {
-          trek_name: trekName,
-          layout: layoutData,
-          created_by: userData.user?.id
-        }
-      ])
+      const layoutData = fabricRef.current.toJSON(['customType'])
 
-    if (error) {
-      console.error(error)
-      alert("Error saving template")
-    } else {
-      alert("Template saved successfully")
-      loadLayouts()
+      const { data, error } = await supabase
+        .from("certificate_templates")
+        .insert([
+          {
+            trek_name: trekName,
+            layout: layoutData,
+            created_by: user.id,
+            background_url: bgUrl,
+            logo_url: logoUrl,
+            signature_url: sigUrl
+          }
+        ])
+        .select()
+
+      if (error) {
+        console.error("Supabase Save Error Details:", error)
+        alert(`Error saving template: ${error.message} (${error.code})`)
+      } else {
+        console.log("Template saved successfully:", data)
+        alert("Template saved successfully!")
+        loadLayouts()
+      }
+    } catch (err) {
+      console.error("Unexpected Save Error:", err)
+      alert("An unexpected error occurred while saving.")
     }
   }
 
@@ -290,7 +355,30 @@ export default function Studio() {
   const loadLayout = (id: string) => {
     const template = layouts.find(l => l.id === id)
     if (!template || !fabricRef.current) return
-    fabricRef.current.loadFromJSON(template.layout, () => fabricRef.current?.renderAll())
+
+    // Restore Background
+    if (template.background_url) {
+      changeBackground(template.background_url)
+    }
+
+    // Restore assets state
+    setLogoUrl(template.logo_url)
+    setSigUrl(template.signature_url)
+
+    fabricRef.current.loadFromJSON(template.layout, () => {
+      setTimeout(() => {
+        document.fonts.ready.then(() => {
+          fabricRef.current?.getObjects().forEach(obj => {
+            if (obj instanceof fabric.Textbox) {
+              obj.set({ objectCaching: false });
+              obj.initDimensions();
+              obj.setCoords();
+            }
+          });
+          fabricRef.current?.renderAll()
+        })
+      }, 100);
+    })
   }
 
   const exportCertificates = async () => {
