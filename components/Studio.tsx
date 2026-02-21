@@ -5,8 +5,8 @@ import { fabric } from 'fabric'
 import { jsPDF } from 'jspdf'
 import JSZip from 'jszip'
 
-const WIDTH = 1400
-const HEIGHT = 990
+const DEFAULT_WIDTH = 1400
+const DEFAULT_HEIGHT = 990
 
 export default function Studio() {
 
@@ -22,22 +22,44 @@ export default function Studio() {
   const [currentName, setCurrentName] = useState('')
   const [layouts, setLayouts] = useState<string[]>([])
   const [backgrounds, setBackgrounds] = useState<string[]>([])
+  const [canvasWidth, setCanvasWidth] = useState(DEFAULT_WIDTH)
+  const [canvasHeight, setCanvasHeight] = useState(DEFAULT_HEIGHT)
   const [scale, setScale] = useState(1)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
+  const [isLocked, setIsLocked] = useState(true)
+  const [password, setPassword] = useState('')
 
   const [logoFile, setLogoFile] = useState<string>('No file chosen')
   const [sigFile, setSigFile] = useState<string>('No file chosen')
   const [bgFile, setBgFile] = useState<string>('No file chosen')
 
-  // Auto-scale to fit the canvas-area
+  useEffect(() => {
+    const auth = localStorage.getItem('auth')
+    if (auth === 'true') {
+      setIsLocked(false)
+    }
+  }, [])
+
+  const handleUnlock = () => {
+    if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'goagad123') {
+      localStorage.setItem('auth', 'true')
+      setIsLocked(false)
+    } else {
+      alert("Incorrect password")
+    }
+  }
+
   const updateScale = useCallback(() => {
     if (!areaRef.current) return
     const areaW = areaRef.current.clientWidth - 48
     const areaH = areaRef.current.clientHeight - 48
-    const scaleX = areaW / WIDTH
-    const scaleY = areaH / HEIGHT
+
+    const scaleX = areaW / canvasWidth
+    const scaleY = areaH / canvasHeight
     setScale(Math.min(scaleX, scaleY, 1))
-  }, [])
+  }, [canvasWidth, canvasHeight])
 
   useEffect(() => {
     updateScale()
@@ -48,26 +70,26 @@ export default function Studio() {
 
   useEffect(() => {
     if (!canvasRef.current || fabricRef.current) return
-    const canvas = new fabric.Canvas(canvasRef.current, { width: WIDTH, height: HEIGHT })
+    const canvas = new fabric.Canvas(canvasRef.current, { width: canvasWidth, height: canvasHeight })
     fabricRef.current = canvas
 
     // Background (locked)
     fabric.Image.fromURL('/default-bg.png', img => {
-      img.scaleToWidth(WIDTH)
-      img.scaleToHeight(HEIGHT)
+      img.scaleToWidth(canvasWidth)
+      img.scaleToHeight(canvasHeight)
       img.selectable = false
       img.evented = false
       canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas))
     })
 
     // Editable Layers
-    addText("CERTIFICATE", WIDTH / 2, 180, 80, true, 'Cinzel', '#8B6B2E', 1000)
-    addText("OF ACHIEVEMENT", WIDTH / 2, 250, 32, false, 'Cinzel', '#8B6B2E', 800)
-    addText("Kalsubai Trek - Highest Peak of Maharashtra", WIDTH / 2, 320, 24, true, 'Montserrat', '#1D1D1B', 1000)
-    addText("This Certificate Is Proudly Presented To", WIDTH / 2, 365, 18, false, 'Montserrat', '#555', 800)
+    addText("CERTIFICATE", canvasWidth / 2, 180, 80, true, 'Cinzel', '#8B6B2E', 1000)
+    addText("OF ACHIEVEMENT", canvasWidth / 2, 250, 32, false, 'Cinzel', '#8B6B2E', 800)
+    addText("Kalsubai Trek - Highest Peak of Maharashtra", canvasWidth / 2, 320, 24, true, 'Montserrat', '#1D1D1B', 1000)
+    addText("This Certificate Is Proudly Presented To", canvasWidth / 2, 365, 18, false, 'Montserrat', '#555', 800)
 
     const nameField = new fabric.Textbox("MILIND GAUDE", {
-      left: WIDTH / 2,
+      left: canvasWidth / 2,
       top: 415,
       width: 1000,
       fontSize: 64,
@@ -83,7 +105,7 @@ export default function Studio() {
     const description = "This certificate is awarded for successfully completing the Kalsubai trek. One of the most challenging treks in Maharashtra, and we commend you for your determination and perseverance. We hope this certificate serves as a reminder of your incredible achievement and inspires you to continue exploring the great outdoors. Congrats!"
 
     const descText = new fabric.Textbox(description, {
-      left: WIDTH / 2,
+      left: canvasWidth / 2,
       top: 510,
       width: 1000,
       fontSize: 20,
@@ -98,23 +120,23 @@ export default function Studio() {
     const footerY = 800
     const footerOffset = 300
 
-    addText("21/08/2025", WIDTH / 2 - footerOffset, footerY, 28, true, 'Montserrat', '#1D1D1B', 300)
-    const dateLine = new fabric.Line([WIDTH / 2 - footerOffset - 120, footerY + 40, WIDTH / 2 - footerOffset + 120, footerY + 40], {
+    addText("21/08/2025", canvasWidth / 2 - footerOffset, footerY, 28, true, 'Montserrat', '#1D1D1B', 300)
+    const dateLine = new fabric.Line([canvasWidth / 2 - footerOffset - 120, footerY + 40, canvasWidth / 2 - footerOffset + 120, footerY + 40], {
       stroke: '#1D1D1B', strokeWidth: 1, selectable: false
     })
     canvas.add(dateLine)
-    addText("DATE", WIDTH / 2 - footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 200)
+    addText("DATE", canvasWidth / 2 - footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 200)
 
-    addText("Milind Gaude", WIDTH / 2 + footerOffset, footerY - 10, 36, false, 'Alex Brush', '#1D1D1B', 300)
-    const sigLine = new fabric.Line([WIDTH / 2 + footerOffset - 120, footerY + 40, WIDTH / 2 + footerOffset + 120, footerY + 40], {
+    addText("Milind Gaude", canvasWidth / 2 + footerOffset, footerY - 10, 36, false, 'Alex Brush', '#1D1D1B', 300)
+    const sigLine = new fabric.Line([canvasWidth / 2 + footerOffset - 120, footerY + 40, canvasWidth / 2 + footerOffset + 120, footerY + 40], {
       stroke: '#1D1D1B', strokeWidth: 1, selectable: false
     })
     canvas.add(sigLine)
-    addText("Head Operations", WIDTH / 2 + footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 300)
+    addText("Head Operations", canvasWidth / 2 + footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 300)
 
     loadLayouts()
     fetchBackgrounds()
-  }, [])
+  }, [canvasWidth, canvasHeight])
 
   const fetchBackgrounds = async () => {
     try {
@@ -129,8 +151,8 @@ export default function Studio() {
   const changeBackground = (url: string) => {
     if (!fabricRef.current) return
     fabric.Image.fromURL(url, img => {
-      img.scaleToWidth(WIDTH)
-      img.scaleToHeight(HEIGHT)
+      img.scaleToWidth(canvasWidth)
+      img.scaleToHeight(canvasHeight)
       img.selectable = false
       img.evented = false
       fabricRef.current?.setBackgroundImage(img, fabricRef.current.renderAll.bind(fabricRef.current))
@@ -180,7 +202,7 @@ export default function Studio() {
     const reader = new FileReader()
     reader.onload = f => {
       fabric.Image.fromURL(f.target?.result as string, img => {
-        img.left = WIDTH - 300
+        img.left = canvasWidth - 300
         img.top = 60
         img.scaleToWidth(180)
         fabricRef.current?.add(img)
@@ -196,7 +218,7 @@ export default function Studio() {
     const reader = new FileReader()
     reader.onload = f => {
       fabric.Image.fromURL(f.target?.result as string, img => {
-        img.left = WIDTH - 400
+        img.left = canvasWidth - 400
         img.top = 720
         img.scaleToWidth(200)
         fabricRef.current?.add(img)
@@ -254,15 +276,15 @@ export default function Studio() {
 
   const generatePDF = async (name: string): Promise<Blob> => {
     return new Promise<Blob>((resolve) => {
-      const clone = new fabric.Canvas(null, { width: WIDTH, height: HEIGHT })
+      const clone = new fabric.Canvas(null, { width: canvasWidth, height: canvasHeight })
       clone.loadFromJSON(fabricRef.current!.toJSON(['customType']), () => {
         clone.getObjects().forEach((obj: any) => {
           if (obj.customType === "name") obj.set({ text: name })
         })
         clone.renderAll()
         const img = clone.toDataURL({ format: "png", multiplier: 2 })
-        const pdf = new jsPDF("landscape", "pt", [WIDTH, HEIGHT])
-        pdf.addImage(img, "PNG", 0, 0, WIDTH, HEIGHT)
+        const pdf = new jsPDF("landscape", "pt", [canvasWidth, canvasHeight])
+        pdf.addImage(img, "PNG", 0, 0, canvasWidth, canvasHeight)
         resolve(pdf.output("blob"))
       })
     })
@@ -304,14 +326,26 @@ export default function Studio() {
   )
 
   const SunIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
     </svg>
   )
 
   const MoonIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  )
+
+  const MenuIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  )
+
+  const CloseIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   )
 
@@ -323,28 +357,38 @@ export default function Studio() {
   )
 
   return (
-    <div className={theme === 'light' ? 'light-theme' : ''} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div className={(theme === 'light' ? 'light-theme' : '') + (isSidebarOpen ? ' sidebar-open' : '')} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+
+      {/* ── Mobile Header ── */}
+      <header className="mobile-only-header">
+        <button className="menu-toggle" onClick={() => setIsSidebarOpen(true)}>
+          <MenuIcon />
+        </button>
+        <h3>GOAGAD Studio</h3>
+        <button className="theme-toggle-mobile" onClick={toggleTheme}>
+          {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+        </button>
+      </header>
+
+      {/* ── Mobile Sidebar Overlay ── */}
+      {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />}
 
       {/* ── Modern Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>Certificate Editor</h3>
-          <button
-            onClick={toggleTheme}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              display: 'flex',
-              padding: '4px',
-              borderRadius: '6px',
-              transition: 'all 0.2s'
-            }}
-            title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
-          >
-            {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={toggleTheme}
+              className="header-icon-btn"
+              title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+            >
+              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+            </button>
+            <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
+              <CloseIcon />
+            </button>
+          </div>
         </div>
 
         <div className="sidebar-body">
@@ -511,17 +555,46 @@ export default function Studio() {
 
       {/* ── Canvas Area ── */}
       <div className="canvas-area" ref={areaRef}>
+
         <div
           ref={wrapperRef}
           className="canvas-scale-wrapper"
           style={{
             transform: `scale(${scale})`,
-            width: WIDTH,
-            height: HEIGHT,
+            width: canvasWidth,
+            height: canvasHeight,
+            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
           <canvas ref={canvasRef} />
         </div>
+
+        {/* ── Auth Overlay ── */}
+        {isLocked && (
+          <div className="auth-overlay">
+            <div className="auth-card">
+              <div style={{ fontSize: '40px', marginBottom: '16px' }}>🔒</div>
+              <h2>GOAGAD Certificate Studio</h2>
+              <div className="field-group">
+                <input
+                  type="password"
+                  className="field-input"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                  autoFocus
+                />
+              </div>
+              <button className="btn btn-accent btn-primary" onClick={handleUnlock}>
+                Unlock Studio
+              </button>
+              <p style={{ marginTop: '20px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Restricted access for administrative use only.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
