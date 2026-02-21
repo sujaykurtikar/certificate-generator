@@ -1,6 +1,6 @@
 
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { fabric } from 'fabric'
 import { jsPDF } from 'jspdf'
 import JSZip from 'jszip'
@@ -12,12 +12,39 @@ export default function Studio() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const fabricRef = useRef<fabric.Canvas | null>(null)
+  const areaRef = useRef<HTMLDivElement | null>(null)
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+
   const [fontSize, setFontSize] = useState(48)
   const [color, setColor] = useState('#8B6B2E')
   const [fontFamily, setFontFamily] = useState('serif')
-  const [names, setNames] = useState('')
+  const [names, setNames] = useState<string[]>([])
+  const [currentName, setCurrentName] = useState('')
   const [layouts, setLayouts] = useState<string[]>([])
   const [backgrounds, setBackgrounds] = useState<string[]>([])
+  const [scale, setScale] = useState(1)
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+
+  const [logoFile, setLogoFile] = useState<string>('No file chosen')
+  const [sigFile, setSigFile] = useState<string>('No file chosen')
+  const [bgFile, setBgFile] = useState<string>('No file chosen')
+
+  // Auto-scale to fit the canvas-area
+  const updateScale = useCallback(() => {
+    if (!areaRef.current) return
+    const areaW = areaRef.current.clientWidth - 48
+    const areaH = areaRef.current.clientHeight - 48
+    const scaleX = areaW / WIDTH
+    const scaleY = areaH / HEIGHT
+    setScale(Math.min(scaleX, scaleY, 1))
+  }, [])
+
+  useEffect(() => {
+    updateScale()
+    const ro = new ResizeObserver(updateScale)
+    if (areaRef.current) ro.observe(areaRef.current)
+    return () => ro.disconnect()
+  }, [updateScale])
 
   useEffect(() => {
     if (!canvasRef.current || fabricRef.current) return
@@ -36,7 +63,6 @@ export default function Studio() {
     // Editable Layers
     addText("CERTIFICATE", WIDTH / 2, 180, 80, true, 'Cinzel', '#8B6B2E', 1000)
     addText("OF ACHIEVEMENT", WIDTH / 2, 250, 32, false, 'Cinzel', '#8B6B2E', 800)
-
     addText("Kalsubai Trek - Highest Peak of Maharashtra", WIDTH / 2, 320, 24, true, 'Montserrat', '#1D1D1B', 1000)
     addText("This Certificate Is Proudly Presented To", WIDTH / 2, 365, 18, false, 'Montserrat', '#555', 800)
 
@@ -69,26 +95,19 @@ export default function Studio() {
     })
     canvas.add(descText)
 
-    // Footer sections (Date and Signature)
     const footerY = 800
     const footerOffset = 300
 
-    // Date
     addText("21/08/2025", WIDTH / 2 - footerOffset, footerY, 28, true, 'Montserrat', '#1D1D1B', 300)
     const dateLine = new fabric.Line([WIDTH / 2 - footerOffset - 120, footerY + 40, WIDTH / 2 - footerOffset + 120, footerY + 40], {
-      stroke: '#1D1D1B',
-      strokeWidth: 1,
-      selectable: false
+      stroke: '#1D1D1B', strokeWidth: 1, selectable: false
     })
     canvas.add(dateLine)
     addText("DATE", WIDTH / 2 - footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 200)
 
-    // Signature
     addText("Milind Gaude", WIDTH / 2 + footerOffset, footerY - 10, 36, false, 'Alex Brush', '#1D1D1B', 300)
     const sigLine = new fabric.Line([WIDTH / 2 + footerOffset - 120, footerY + 40, WIDTH / 2 + footerOffset + 120, footerY + 40], {
-      stroke: '#1D1D1B',
-      strokeWidth: 1,
-      selectable: false
+      stroke: '#1D1D1B', strokeWidth: 1, selectable: false
     })
     canvas.add(sigLine)
     addText("Head Operations", WIDTH / 2 + footerOffset, footerY + 50, 18, true, 'Montserrat', '#1D1D1B', 300)
@@ -101,9 +120,7 @@ export default function Studio() {
     try {
       const res = await fetch('/api/list-bgs')
       const data = await res.json()
-      if (data.backgrounds) {
-        setBackgrounds(data.backgrounds)
-      }
+      if (data.backgrounds) setBackgrounds(data.backgrounds)
     } catch (error) {
       console.error('Failed to fetch backgrounds:', error)
     }
@@ -123,15 +140,11 @@ export default function Studio() {
   const uploadBackground = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
+    setBgFile(file.name)
     const formData = new FormData()
     formData.append('file', file)
-
     try {
-      const res = await fetch('/api/upload-bg', {
-        method: 'POST',
-        body: formData
-      })
+      const res = await fetch('/api/upload-bg', { method: 'POST', body: formData })
       const data = await res.json()
       if (data.success) {
         fetchBackgrounds()
@@ -139,22 +152,15 @@ export default function Studio() {
       } else {
         alert(data.error || 'Upload failed')
       }
-    } catch (error) {
-      console.error('Upload error:', error)
+    } catch {
       alert('Upload failed')
     }
   }
 
   const addText = (text: string, x: number, y: number, size: number, bold: boolean, family = 'serif', color = '#000', width = 800) => {
     const t = new fabric.Textbox(text, {
-      left: x,
-      top: y,
-      width: width,
-      fontSize: size,
-      fill: color,
-      textAlign: 'center',
-      originX: 'center',
-      fontFamily: family,
+      left: x, top: y, width, fontSize: size, fill: color,
+      textAlign: 'center', originX: 'center', fontFamily: family,
       fontWeight: bold ? 'bold' : 'normal'
     })
     fabricRef.current?.add(t)
@@ -167,9 +173,10 @@ export default function Studio() {
     fabricRef.current?.renderAll()
   }
 
-  const uploadLogo = (e: any) => {
-    const file = e.target.files[0]
+  const uploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
+    setLogoFile(file.name)
     const reader = new FileReader()
     reader.onload = f => {
       fabric.Image.fromURL(f.target?.result as string, img => {
@@ -182,9 +189,10 @@ export default function Studio() {
     reader.readAsDataURL(file)
   }
 
-  const uploadSignature = (e: any) => {
-    const file = e.target.files[0]
+  const uploadSignature = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
+    setSigFile(file.name)
     const reader = new FileReader()
     reader.onload = f => {
       fabric.Image.fromURL(f.target?.result as string, img => {
@@ -202,36 +210,41 @@ export default function Studio() {
 
   const saveLayout = () => {
     if (!fabricRef.current) return
-    const name = prompt("Layout name?")
-    if (!name) return
-    localStorage.setItem("layout_" + name, JSON.stringify(fabricRef.current.toJSON(['customType'])))
+    const trekName = prompt("Enter Trek Name (e.g., Kalsubai, AMK)")
+    if (!trekName) return
+
+    const layoutData = fabricRef.current.toJSON(['customType'])
+    const allTemplates = JSON.parse(localStorage.getItem("trekTemplates") || "{}")
+    allTemplates[trekName] = layoutData
+    localStorage.setItem("trekTemplates", JSON.stringify(allTemplates))
+
     loadLayouts()
   }
 
   const loadLayouts = () => {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith("layout_"))
-    setLayouts(keys.map(k => k.replace("layout_", "")))
+    const allTemplates = JSON.parse(localStorage.getItem("trekTemplates") || "{}")
+    setLayouts(Object.keys(allTemplates))
   }
 
   const loadLayout = (name: string) => {
-    const data = localStorage.getItem("layout_" + name)
+    const allTemplates = JSON.parse(localStorage.getItem("trekTemplates") || "{}")
+    const data = allTemplates[name]
     if (!data || !fabricRef.current) return
     fabricRef.current.loadFromJSON(data, () => fabricRef.current?.renderAll())
   }
 
   const exportCertificates = async () => {
     if (!fabricRef.current) return
-    const list = names.split('\n').map(n => n.trim()).filter(Boolean)
-    if (!list.length) return alert("Enter at least one name")
+    if (!names.length) return alert("Enter at least one name")
 
-    if (list.length === 1) {
-      const blob = await generatePDF(list[0])
-      download(blob, list[0] + ".pdf")
+    if (names.length === 1) {
+      const blob = await generatePDF(names[0])
+      download(blob, names[0] + ".pdf")
       return
     }
 
     const zip = new JSZip()
-    for (const n of list) {
+    for (const n of names) {
       const blob = await generatePDF(n)
       zip.file(n + ".pdf", blob)
     }
@@ -239,14 +252,12 @@ export default function Studio() {
     download(content, "certificates.zip")
   }
 
-  const generatePDF = async (name: string) => {
+  const generatePDF = async (name: string): Promise<Blob> => {
     return new Promise<Blob>((resolve) => {
       const clone = new fabric.Canvas(null, { width: WIDTH, height: HEIGHT })
       clone.loadFromJSON(fabricRef.current!.toJSON(['customType']), () => {
         clone.getObjects().forEach((obj: any) => {
-          if (obj.customType === "name") {
-            obj.set({ text: name })
-          }
+          if (obj.customType === "name") obj.set({ text: name })
         })
         clone.renderAll()
         const img = clone.toDataURL({ format: "png", multiplier: 2 })
@@ -257,86 +268,260 @@ export default function Studio() {
     })
   }
 
-  const download = (blob: any, filename: string) => {
+  const download = (blob: Blob, filename: string) => {
     const link = document.createElement("a")
     link.href = URL.createObjectURL(blob)
     link.download = filename
     link.click()
   }
 
+  const addParticipant = () => {
+    if (!currentName.trim()) return
+    setNames([...names, currentName.trim()])
+    setCurrentName('')
+  }
+
+  const removeParticipant = (index: number) => {
+    setNames(names.filter((_, i) => i !== index))
+  }
+
+  const clearAllParticipants = () => {
+    if (confirm("Clear all participants?")) setNames([])
+  }
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light')
+
+  const UserIcon = () => (
+    <svg className="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  )
+
+  const DownloadIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  )
+
+  const SunIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  )
+
+  const MoonIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  )
+
+  const UploadIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
+      <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+    </svg>
+  )
+
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
-      <div className="sidebar">
-        <h3>Certificate Editor</h3>
+    <div className={theme === 'light' ? 'light-theme' : ''} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
 
-        <label>Font</label>
-        <select style={{ width: '100%' }} onChange={e => setFontFamily(e.target.value)}>
-          <option value="serif">Serif</option>
-          <option value="sans-serif">Sans</option>
-          <option value="monospace">Mono</option>
-        </select>
-
-        <label>Font Size</label>
-        <input type="number" style={{ width: '100%' }} value={fontSize} onChange={e => setFontSize(parseInt(e.target.value))} />
-
-        <label>Color</label>
-        <input type="color" value={color} onChange={e => setColor(e.target.value)} />
-
-        <button className="button secondary" onClick={applyStyle}>Apply Style</button>
-
-        <hr />
-        <label>Backgrounds</label>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '10px',
-          maxHeight: '200px',
-          overflowY: 'auto',
-          padding: '10px',
-          border: '1px solid #ddd',
-          borderRadius: '4px'
-        }}>
-          {backgrounds.map(bg => (
-            <div
-              key={bg}
-              onClick={() => changeBackground(bg)}
-              style={{
-                cursor: 'pointer',
-                border: '2px solid transparent',
-                borderRadius: '4px',
-                overflow: 'hidden'
-              }}
-            >
-              <img src={bg} alt="Background" style={{ width: '100%', display: 'block' }} />
-            </div>
-          ))}
+      {/* ── Modern Sidebar ── */}
+      <aside className="sidebar">
+        <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>Certificate Editor</h3>
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              padding: '4px',
+              borderRadius: '6px',
+              transition: 'all 0.2s'
+            }}
+            title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+          >
+            {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+          </button>
         </div>
-        <input type="file" onChange={uploadBackground} style={{ marginTop: '10px' }} />
-        <p style={{ fontSize: '12px', color: '#666' }}>Upload new background</p>
 
-        <hr />
+        <div className="sidebar-body">
 
-        <label>Logos & Signatures</label>
-        <input type="file" onChange={uploadLogo} />
-        <input type="file" onChange={uploadSignature} />
-        <button className="button secondary" onClick={enableDraw}>Draw Signature</button>
-        <button className="button secondary" onClick={disableDraw}>Stop Draw</button>
+          {/* ── Typography ── */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Typography</div>
 
-        <hr />
+            <div className="field-group">
+              <label className="field-label">Font Family</label>
+              <select className="field-input" value={fontFamily} onChange={e => setFontFamily(e.target.value)}>
+                <option value="serif">Serif</option>
+                <option value="sans-serif">Sans-serif</option>
+                <option value="monospace">Monospace</option>
+                <option value="Cinzel">Cinzel</option>
+                <option value="Montserrat">Montserrat</option>
+                <option value="Lora">Lora</option>
+              </select>
+            </div>
 
-        <button className="button secondary" onClick={saveLayout}>Save Layout</button>
-        <select style={{ width: '100%' }} onChange={e => loadLayout(e.target.value)}>
-          <option>Load Layout</option>
-          {layouts.map(l => <option key={l}>{l}</option>)}
-        </select>
+            <div className="field-group">
+              <label className="field-label">Font Size</label>
+              <input
+                type="number"
+                className="field-input"
+                value={fontSize}
+                min={8}
+                max={200}
+                onChange={e => setFontSize(parseInt(e.target.value))}
+              />
+            </div>
 
-        <textarea style={{ width: '100%', height: 100 }} placeholder="Enter names, one per line" value={names} onChange={e => setNames(e.target.value)} />
+            <div className="field-group">
+              <label className="field-label">Color</label>
+              <div className="color-row">
+                <div className="color-swatch-wrapper">
+                  <div className="color-preview" style={{ background: color }} />
+                  <input type="color" value={color} onChange={e => setColor(e.target.value)} />
+                </div>
+                <span className="color-value">{color.toUpperCase()}</span>
+              </div>
+            </div>
 
-        <button className="button primary" onClick={exportCertificates}>Download Certificate(s)</button>
-      </div>
+            <button className="btn btn-accent" onClick={applyStyle}>
+              Apply Style
+            </button>
+          </div>
 
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#eee' }}>
-        <canvas ref={canvasRef} />
+          {/* ── Backgrounds ── */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Backgrounds</div>
+
+            {backgrounds.length > 0 && (
+              <div className="bg-grid" style={{ marginBottom: 12 }}>
+                {backgrounds.map(bg => (
+                  <div key={bg} className="bg-thumb" onClick={() => changeBackground(bg)}>
+                    <img src={bg} alt="Background" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="file-upload-label">
+              <UploadIcon />
+              <span>{bgFile}</span>
+              <input type="file" accept="image/*" onChange={uploadBackground} />
+            </label>
+          </div>
+
+          {/* ── Logos & Signatures ── */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Logos & Signatures</div>
+
+            <div className="field-group">
+              <label className="field-label">Upload Logo</label>
+              <label className="file-upload-label">
+                <UploadIcon />
+                <span>{logoFile}</span>
+                <input type="file" accept="image/*" onChange={uploadLogo} />
+              </label>
+            </div>
+
+            <div className="field-group">
+              <label className="field-label">Upload Signature</label>
+              <label className="file-upload-label">
+                <UploadIcon />
+                <span>{sigFile}</span>
+                <input type="file" accept="image/*" onChange={uploadSignature} />
+              </label>
+            </div>
+
+            <div className="btn-row" style={{ marginTop: 4 }}>
+              <button className="btn btn-accent" onClick={enableDraw}>✏️ Draw</button>
+              <button className="btn btn-danger" onClick={disableDraw}>⛔ Stop</button>
+            </div>
+          </div>
+
+          {/* ── Trek Locations ── */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Trek Locations</div>
+
+            <button className="btn btn-info" onClick={saveLayout} style={{ marginBottom: 10 }}>
+              💾 Save Trek Template
+            </button>
+
+            <div className="field-group">
+              <label className="field-label">Select Trek Location</label>
+              <select className="field-input" onChange={e => loadLayout(e.target.value)}>
+                <option value="">— Select trek —</option>
+                {layouts.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* ── Bulk Certificates ── */}
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Bulk Certificates</div>
+
+            <div className="add-input-group">
+              <input
+                type="text"
+                className="field-input"
+                placeholder="Add participant name..."
+                value={currentName}
+                onChange={e => setCurrentName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addParticipant()}
+              />
+              <button className="add-btn" onClick={addParticipant}>
+                <span>+</span> Add
+              </button>
+            </div>
+
+            <div className="participant-list">
+              {names.map((name, idx) => (
+                <div key={idx} className="participant-chip">
+                  <UserIcon />
+                  <span>{name}</span>
+                  <span className="delete-btn" onClick={() => removeParticipant(idx)}>×</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="stats-row">
+              <div>Total Participants: <span className="stats-count">{names.length}</span></div>
+            </div>
+
+            <div className="generate-btn-wrapper">
+              <button className="btn btn-danger" onClick={clearAllParticipants}>
+                Clear All
+              </button>
+              <button className="generate-btn" onClick={exportCertificates} disabled={names.length === 0}>
+                <DownloadIcon />
+                Generate {names.length} Certificates
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Hidden Download ── */}
+        <div style={{ display: 'none' }}>
+        </div>
+      </aside>
+
+      {/* ── Canvas Area ── */}
+      <div className="canvas-area" ref={areaRef}>
+        <div
+          ref={wrapperRef}
+          className="canvas-scale-wrapper"
+          style={{
+            transform: `scale(${scale})`,
+            width: WIDTH,
+            height: HEIGHT,
+          }}
+        >
+          <canvas ref={canvasRef} />
+        </div>
       </div>
     </div>
   )
